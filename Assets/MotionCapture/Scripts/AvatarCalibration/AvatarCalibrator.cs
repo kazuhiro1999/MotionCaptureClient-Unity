@@ -1,7 +1,5 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using MotionCapture.Data;
+using MotionCapture.Core;
 
 namespace MotionCapture.Calibration
 {

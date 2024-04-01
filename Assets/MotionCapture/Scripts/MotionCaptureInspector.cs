@@ -2,11 +2,11 @@ using System;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
-using MotionCapture.Data;
+using MotionCapture.Core;
 
 public class MotionCaptureInspector : MonoBehaviour
 {
-    public int BufferSize;
+    public int BufferSize = 10;
     public Text Text;
 
     private List<long> timestamps = new List<long>();
@@ -30,12 +30,12 @@ public class MotionCaptureInspector : MonoBehaviour
         else {
             _fps = 0f;
         }
-        Text.text = $"FPS: {_fps}\nDelay: {_delay}";
+        Text.text = $"FPS: {_fps.ToString("F")}\nDelay: {_delay.ToString("F")}";
     }
 
     public void OnDataReceived(PoseData pose) {
 
-        timestamps.Add(pose.TimeStamp);
+        timestamps.Add(pose.timestamp);
         if (timestamps.Count > BufferSize)
             timestamps.RemoveAt(0);
     }

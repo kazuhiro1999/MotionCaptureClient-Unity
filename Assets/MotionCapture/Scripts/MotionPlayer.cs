@@ -1,9 +1,10 @@
+using System.IO;
 using UnityEngine;
 using UnityEditor;
-using MotionCapture.Data;
 using UnityEngine.Events;
+using MotionCapture.Core;
 using System;
-using System.IO;
+using System.Threading.Tasks;
 
 namespace MotionCapture 
 {
@@ -22,20 +23,24 @@ namespace MotionCapture
         [Header("Events")]
         public UnityEvent<PoseData> OnTimeUpdated = new UnityEvent<PoseData>();
 
+        private int _currentIndex;
 
-        void Start() {
+
+        async void Start() {
+            _currentIndex = 0;
 
             if (FilePath != "")
-                this.motion = LoadMotion(FilePath);
+                this.motion = await LoadMotion(FilePath);
             else
                 this.motion = new MotionData();
         }
+
         void Update() {
             if (isPlaying) {
                 time += Time.deltaTime;
 
                 // モーション終了判定
-                if (time > motion.GetLatestPose().GetTimeSecond()) {
+                if (time > motion.Length) {
                     if (isLoop) {
                         time = 0f;
                     } else {
@@ -43,15 +48,43 @@ namespace MotionCapture
                     }
                 }
 
+                float startTime = time - 0.1f, endTime = time + 0.1f;
+                int start = -1, end = -1;
+
+                if (_currentIndex > 0 && motion.Poses[_currentIndex - 1].timestamp / 1000f > startTime)
+                    _currentIndex = 0;
+
+                int index = Math.Max(0, _currentIndex - 1); // 少し前から検索を開始
+
+                // 範囲内の最初のポーズを探索
+                while (index < motion.Poses.Count)
+                {
+                    if (motion.Poses[index].timestamp / 1000f >= startTime)
+                    {
+                        start = index;
+                        _currentIndex = index;
+                        break;
+                    }
+                    index++;
+                }
+                index++;
+                end = index;
+                // 範囲内の最後のポーズを探索
+                while (index < motion.Poses.Count)
+                {
+                    if (motion.Poses[index].timestamp / 1000f <= endTime)
+                    {
+                        end = index;
+                        index++;
+                    }
+                    else
+                    {
+                        break; // 終了時刻を超えたら終了
+                    }
+                }
+
                 // 対応するポーズを取得
-                MotionData poses = motion.Extract(time - 0.05f, time + 0.05f);
-                PoseData pose = poses.Average();
-
-                if (pose == null)
-                    return;
-
-                // 仮コード
-                pose.Left2Right();
+                PoseData pose = motion.GetAveragePose(start, end);
 
                 OnTimeUpdated?.Invoke(pose);
             }
@@ -69,28 +102,18 @@ namespace MotionCapture
             time = t;
         }
 
-        void EndMotion() {
-            time = 0f;
-            if (!isLoop) {
-                isPlaying = false;
-            }
-        }
-
-        public MotionData LoadMotion(string filepath) {
+        public async Task<MotionData> LoadMotion(string filepath) {
             if (string.IsNullOrEmpty(filepath)) {
                 Debug.LogError("Filepath could not be null");
-                return new MotionData();
-            }
-            string path = filepath;
-            if (!File.Exists(path)) {
-                Debug.LogError($"[DataManager] File not exists : {path}");
                 return null;
             }
-            string json = File.ReadAllText(path);            
-            if (!string.IsNullOrEmpty(json)) {
-                motion = JsonUtility.FromJson<MotionData>(json);
-            }           
-            Debug.Log($"Motion loaded from {filepath} : length={motion.GetLatestPose().GetTimeSecond()}");
+            if (!File.Exists(filepath)) {
+                Debug.LogError($"File not exists : {filepath}");
+                return null;
+            }
+            byte[] bytes = await File.ReadAllBytesAsync(filepath);
+            MotionData motion = MotionData.Decode(bytes);    
+            Debug.Log($"Motion loaded from {filepath} : length={motion.Length}");
             time = 0f;
             return motion;
         }
@@ -110,7 +133,7 @@ namespace MotionCapture
 
             player.FilePath = EditorGUILayout.TextField("File Path", player.FilePath);
             if (GUILayout.Button("Load")) {
-                player.LoadMotion(player.FilePath);
+                _ = player.LoadMotion(player.FilePath);
             }
 
             if (!player.isPlaying) {

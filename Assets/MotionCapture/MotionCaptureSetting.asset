@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8d6aac85e1b0442489a4523b936e09b7, type: 3}
   m_Name: MotionCaptureSetting
   m_EditorClassIdentifier: 
-  ConfigPath: config.json
+  ConfigPath: data/booth/config.json
   Cameras:
   - Name: cFL
     Type: 0
